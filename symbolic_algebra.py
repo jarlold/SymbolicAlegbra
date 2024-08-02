@@ -1,10 +1,11 @@
 from operation_nodes import *
 
-
 t1 = Subtraction("C", Multiplication("A", "B"))
 t2 = Subtraction("C", Multiplication("B", "A"))
 
-print(trees_are_equal(t1, t2))
+print(t1.equal_to(t2))
+
+exit()
 
 
 if __name__ == "__main__":
