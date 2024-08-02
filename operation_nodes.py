@@ -1,3 +1,4 @@
+# Some helper functions
 def is_float(a):
     try:
         float(a)
@@ -31,7 +32,7 @@ class SyntaxNode:
         self.communative = False
 
     def __str__(self):
-       return "( {} {} {} )".format(self.symbol, str(self.arg1), str(self.arg2)) 
+        return "( {} {} {} )".format(self.symbol, str(self.arg1), str(self.arg2)) 
 
     def equal_to(self, t2):
         # If he's not symbolic, then let's see if we can not be symbolic too
