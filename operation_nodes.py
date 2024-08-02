@@ -105,7 +105,7 @@ class Multiplication(SyntaxNode):
     def __init__(self, arg1, arg2):
         super().__init__(arg1, arg2)
         self.symbol = "*"
-        #self.communative = True
+        self.communative = True
 
     def perform(self):
         # If they're operations, perform them
