@@ -3,12 +3,14 @@
 #include <vector>
 #include <set>
 #include <array>
+#include <cmath>
 
 typedef float NumKin;
 
 enum Operation {
     MULT,
     ADD,
+    POW,
     NONE
 };
 
@@ -45,6 +47,23 @@ Node multNodes(Node& n1, Node& n2, int id) {
     return n3;
 }
 
+
+Node powNode(Node& n1, Node& n2, int id) {
+    // No taking powers like x^x
+    if (n2.oper != NONE) {
+        throw std::invalid_argument("Can't take things to the power of a function just yet.");
+    }
+
+    Node n3;
+    n3.children.push_back(n1);
+    n3.children.push_back(n2);
+    n3.oper = POW;
+    n3.grad = 1;
+    n3.id = id;
+
+    return n3;
+}
+
 Node constantNode(NumKin v, int id) {
     Node n;
     n.oper = NONE;
@@ -70,6 +89,10 @@ void updateValue(Node& n) {
         case ADD:
             n.value = n.children[0].value + n.children[1].value;
         break;
+
+        case POW:
+            n.value = pow(n.children[0].value, n.children[1].value);
+        break;
         
         case NONE:
           // This shouldn't happen don't do this
@@ -92,13 +115,21 @@ void updateBack(Node& n) {
 
     switch (n.oper) {
         case MULT:
-            n.children[1].grad = n.children[0].value * n.grad;
             n.children[0].grad = n.children[1].value * n.grad;
+            n.children[1].grad = n.children[0].value * n.grad;
         break;
         
         case ADD:
-            n.children[1].grad = 1 * n.grad;
             n.children[0].grad = 1 * n.grad;
+            n.children[1].grad = 1 * n.grad;
+        break;
+
+        case POW:
+            // (x^8)` = 8(x^7)
+            // This won't work for taking things to a power that isn't NumberKin, to solve that I've
+            // forbidden it.
+            n.children[0].grad =
+                n.children[1].value * pow( n.children[0].value, n.children[1].value-1) * n.grad;
         break;
         
         case NONE:
@@ -126,22 +157,15 @@ void doPrintGrad(Node& root) {
 
 
 int main() {
-    Node x_1 = constantNode(3.0, 1);
+    Node x_1 = constantNode(5.0, 1);
     Node x_2 = constantNode(4.0, 2);
-    Node x_3 = multNodes(x_2, x_1, 3);
-    Node x_4 = constantNode(5.0, 4);
-    Node x_5 = addNodes(x_4, x_3, 5);
-    Node x_6 = constantNode(2.0, 6);
-
-    Node exp = multNodes(x_6, x_5, 7);
-
+    Node exp = powNode(x_1, x_2, 3);
 
     NumKin out = forward(exp);
     printf("VALUE %f\r\n", out);
     updateBack(exp);
     printf("\r\n");
     doPrintGrad(exp);
-
 }
 
 
