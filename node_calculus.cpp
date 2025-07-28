@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 #include <cmath>
 #include <memory>
@@ -258,42 +259,6 @@ void backpropagation(NodePtr root) {
 
 /*
 int main() {
-    auto x = constantNode(1.0f);
-    auto y = constantNode(2.0f);
-    auto z = constantNode(0.5f);
-
-    auto expx = expNode(x);
-    auto logy = logNode(y);
-    auto sinx = sinNode(x);
-    auto cosy = cosNode(y);
-    auto tanhz = tanhNode(z);
-    auto sqrtz = sqrtNode(z);
-
-    auto powxy = powNode(x, y);
-    auto mul1 = multNodes(expx, logy);
-    auto div1 = divNodes(powxy, sqrtz);
-    auto negx = negNode(x);
-
-    auto sum1 = addNodes(sinx, cosy);
-    auto sum2 = addNodes(sum1, tanhz);
-    auto relux = reluNode(negx);
-    auto mul2 = multNodes(sum2, relux);
-    auto add3 = addNodes(mul1, mul2);
-    auto final_expr = addNodes(add3, div1);
-
-    forward(final_expr);
-
-    backpropagation(final_expr);
-
-    std::cout << "X: " << x->grad << "\n";
-    std::cout << "Y: " << y->grad << "\n";
-    std::cout << "Z: " << z->grad << "\n";
-
-    return 0;
-}
-*/
-
-int main() {
     auto a = constantNode(3.0f);
     auto b = constantNode(-1.5f);
     auto c = constantNode(0.0f);
@@ -368,4 +333,4 @@ int main() {
 
     return 0;
 }
-
+*/
