@@ -1,9 +1,7 @@
 #include <iostream>
-#include <string>
-#include <vector>
-#include <set>
-#include <array>
 #include <cmath>
+#include <memory>
+#include <unordered_set>
 
 typedef float NumKin;
 
@@ -11,162 +9,363 @@ enum Operation {
     MULT,
     ADD,
     POW,
+    EXP,
+    LOG,
+    SIN,
+    COS,
+    TANH,
+    DIV,
+    RELU,
     NONE
 };
 
 struct Node {
-  NumKin value;
-  NumKin grad;
-  Operation oper;
-  std::vector<Node> children;
-  int id;
+    NumKin value = 0.0f;
+    NumKin grad = 0.0f;
+    Operation oper = NONE;
+    std::shared_ptr<Node> lhs = nullptr;
+    std::shared_ptr<Node> rhs = nullptr; // if the operation only takes
+                                         // one input then this bad boy gets to stay null
 };
 
-struct Expression {
-    std::vector<Node> nodes;
-    Node& root;
-};
+// A man can only type so much
+using NodePtr = std::shared_ptr<Node>;
 
-Node addNodes(Node& n1, Node& n2, int id) {
-    Node n3;
-    n3.children.push_back(n1);
-    n3.children.push_back(n2);
-    n3.oper = ADD;
-    n3.grad = 1;
-    n3.id = id;
-    return n3;
-}
-
-Node multNodes(Node& n1, Node& n2, int id) {
-    Node n3;
-    n3.children.push_back(n1);
-    n3.children.push_back(n2);
-    n3.oper = MULT;
-    n3.grad = 1;
-    n3.id = id;
-    return n3;
-}
-
-
-Node powNode(Node& n1, Node& n2, int id) {
-    // No taking powers like x^x
-    if (n2.oper != NONE) {
-        throw std::invalid_argument("Can't take things to the power of a function just yet.");
-    }
-
-    Node n3;
-    n3.children.push_back(n1);
-    n3.children.push_back(n2);
-    n3.oper = POW;
-    n3.grad = 1;
-    n3.id = id;
-
-    return n3;
-}
-
-Node constantNode(NumKin v, int id) {
-    Node n;
-    n.oper = NONE;
-    n.grad = 1;
-    n.value = v;
-    n.id = id;
+// Should really be called "variable node" in hindsight.
+NodePtr constantNode(NumKin v) {
+    auto n = std::make_shared<Node>();
+    n->value = v;
     return n;
 }
 
-void updateValue(Node& n) {
-    if (n.oper == NONE) {
-        return;
-    }
 
-    updateValue(n.children[0]);
-    updateValue(n.children[1]);
+// These are operations that take two expression-node-things
+// and returns a new one, that performs the operation on them both
+NodePtr addNodes(NodePtr lhs, NodePtr rhs) {
+    auto n = std::make_shared<Node>();
+    n->lhs = lhs;
+    n->rhs = rhs;
+    n->oper = ADD;
+    return n;
+}
 
-    switch (n.oper) {
+NodePtr multNodes(NodePtr lhs, NodePtr rhs) {
+    auto n = std::make_shared<Node>();
+    n->lhs = lhs;
+    n->rhs = rhs;
+    n->oper = MULT;
+    return n;
+}
+
+NodePtr powNode(NodePtr lhs, NodePtr rhs) {
+    auto n = std::make_shared<Node>();
+    n->lhs = lhs;
+    n->rhs = rhs;
+    n->oper = POW;
+    return n;
+}
+
+NodePtr expNode(NodePtr lhs) {
+    auto n = std::make_shared<Node>();
+    n->lhs = lhs;
+    n->oper = EXP;
+    return n;
+}
+
+NodePtr logNode(NodePtr lhs) {
+    auto n = std::make_shared<Node>();
+    n->lhs = lhs;
+    n->oper = LOG;
+    return n;
+}
+
+NodePtr sinNode(NodePtr lhs) {
+    auto n = std::make_shared<Node>();
+    n->lhs = lhs;
+    n->oper = SIN;
+    return n;
+}
+
+NodePtr cosNode(NodePtr lhs) {
+    auto n = std::make_shared<Node>();
+    n->lhs = lhs;
+    n->oper = COS;
+    return n;
+}
+
+NodePtr tanhNode(NodePtr lhs) {
+    auto n = std::make_shared<Node>();
+    n->lhs = lhs;
+    n->oper = TANH;
+    return n;
+}
+
+NodePtr divNodes(NodePtr lhs, NodePtr rhs) {
+    auto n = std::make_shared<Node>();
+    n->lhs = lhs;
+    n->rhs = rhs;
+    n->oper = DIV;
+    return n;
+}
+
+NodePtr reluNode(NodePtr lhs) {
+    auto n = std::make_shared<Node>();
+    n->lhs = lhs;
+    n->oper = RELU;
+    return n;
+}
+
+NodePtr sqrtNode(NodePtr lhs) {
+    auto half = constantNode(0.5f);
+    return powNode(lhs, half);
+}
+
+NodePtr negNode(NodePtr lhs) {
+    auto minusOne = constantNode(-1.0f);
+    return multNodes(minusOne, lhs);
+}
+
+// Forward pass with visited set
+// This goes through and updates all the values in the nodes
+void updateValue(NodePtr n, std::unordered_set<NodePtr>& visited) {
+
+    // Make sure we don't re-use a node somehow.
+    // This shouldn't get triggered but I'm pretty sure it does...
+    if (!n || visited.count(n)) return;
+    visited.insert(n);
+
+    if (n->oper == NONE) return;
+
+    if (n->lhs) updateValue(n->lhs, visited);
+    if (n->rhs) updateValue(n->rhs, visited);
+
+    switch (n->oper) {
         case MULT:
-            n.value = n.children[0].value * n.children[1].value;
-        break;
-        
+            n->value = n->lhs->value * n->rhs->value;
+            break;
         case ADD:
-            n.value = n.children[0].value + n.children[1].value;
-        break;
-
+            n->value = n->lhs->value + n->rhs->value;
+            break;
         case POW:
-            n.value = pow(n.children[0].value, n.children[1].value);
-        break;
-        
-        case NONE:
-          // This shouldn't happen don't do this
-        break;
+            n->value = pow(n->lhs->value, n->rhs->value);
+            break;
+        case EXP:
+            n->value = exp(n->lhs->value);
+            break;
+        case LOG:
+            n->value = log(n->lhs->value);
+            break;
+        case SIN:
+            n->value = sin(n->lhs->value);
+            break;
+        case COS:
+            n->value = cos(n->lhs->value);
+            break;
+        case TANH:
+            n->value = tanh(n->lhs->value);
+            break;
+        case DIV:
+            n->value = n->lhs->value / n->rhs->value;
+            break;
+        case RELU:
+            n->value = std::max(0.0f, n->lhs->value);
+            break;
+        default:
+            break;
     }
 }
 
-NumKin forward(Node& root) {
-    updateValue(root);
-    return root.value;
+NumKin forward(NodePtr root) {
+    std::unordered_set<NodePtr> visited;
+    updateValue(root, visited);
+    return root->value;
 }
 
-void updateBack(Node& n) {
-    // This function goes through the syntax tree updating the 
-    // grad on all the children.
+// Backward pass with visited set
+void updateBack(NodePtr n, std::unordered_set<NodePtr>& visited) {
+    if (!n || visited.count(n)) return;
+    visited.insert(n);
 
-    if (n.oper == NONE) {
-        return;
-    }
+    if (n->oper == NONE) return;
 
-    switch (n.oper) {
+    switch (n->oper) {
         case MULT:
-            n.children[0].grad = n.children[1].value * n.grad;
-            n.children[1].grad = n.children[0].value * n.grad;
-        break;
-        
+            n->lhs->grad += n->rhs->value * n->grad;
+            n->rhs->grad += n->lhs->value * n->grad;
+            updateBack(n->lhs, visited);
+            updateBack(n->rhs, visited);
+            break;
         case ADD:
-            n.children[0].grad = 1 * n.grad;
-            n.children[1].grad = 1 * n.grad;
-        break;
-
+            n->lhs->grad += n->grad;
+            n->rhs->grad += n->grad;
+            updateBack(n->lhs, visited);
+            updateBack(n->rhs, visited);
+            break;
         case POW:
-            // (x^8)` = 8(x^7)
-            // This won't work for taking things to a power that isn't NumberKin, to solve that I've
-            // forbidden it.
-            n.children[0].grad =
-                n.children[1].value * pow( n.children[0].value, n.children[1].value-1) * n.grad;
-        break;
-        
-        case NONE:
-          // This shouldn't happen don't do this
-        break;
+            if (n->lhs->value > 0) {
+                n->lhs->grad += n->rhs->value * pow(n->lhs->value, n->rhs->value - 1) * n->grad;
+                n->rhs->grad += log(n->lhs->value) * pow(n->lhs->value, n->rhs->value) * n->grad;
+            }
+            updateBack(n->lhs, visited);
+            updateBack(n->rhs, visited);
+            break;
+        case EXP:
+            n->lhs->grad += n->value * n->grad;
+            updateBack(n->lhs, visited);
+            break;
+        case LOG:
+            n->lhs->grad += (1 / n->lhs->value) * n->grad;
+            updateBack(n->lhs, visited);
+            break;
+        case SIN:
+            n->lhs->grad += cos(n->lhs->value) * n->grad;
+            updateBack(n->lhs, visited);
+            break;
+        case COS:
+            n->lhs->grad += -sin(n->lhs->value) * n->grad;
+            updateBack(n->lhs, visited);
+            break;
+        case TANH: {
+            NumKin t = tanh(n->lhs->value);
+            n->lhs->grad += (1 - t * t) * n->grad;
+            updateBack(n->lhs, visited);
+            break;
+        }
+        case DIV: {
+            NumKin a = n->lhs->value;
+            NumKin b = n->rhs->value;
+            n->lhs->grad += (1 / b) * n->grad;
+            n->rhs->grad += (-a / (b * b)) * n->grad;
+            updateBack(n->lhs, visited);
+            updateBack(n->rhs, visited);
+            break;
+        }
+        case RELU: {
+            n->lhs->grad += (n->lhs->value > 0 ? 1.0f : 0.0f) * n->grad;
+            updateBack(n->lhs, visited);
+            break;
+        }
+        default:
+            break;
     }
-
-    updateBack(n.children[0]);
-    updateBack(n.children[1]);
 }
 
-void backpropogation(Node& root) {
-    root.grad = 1;
+void backpropagation(NodePtr root) {
+    root->grad = 1.0f;
+    std::unordered_set<NodePtr> visited;
+    updateBack(root, visited);
 }
 
-void doPrintGrad(Node& root) {
-    if (root.oper == NONE) {
-        printf("%d: Grad %f, Value %f (const)\r\n", root.id, root.grad, root.value);
-    } else {
-        printf("%d: Grad %f, Value %f\r\n", root.id, root.grad, root.value);
-        doPrintGrad(root.children[0]);
-        doPrintGrad(root.children[1]);
-    }
-}
+/*
+int main() {
+    auto x = constantNode(1.0f);
+    auto y = constantNode(2.0f);
+    auto z = constantNode(0.5f);
 
+    auto expx = expNode(x);
+    auto logy = logNode(y);
+    auto sinx = sinNode(x);
+    auto cosy = cosNode(y);
+    auto tanhz = tanhNode(z);
+    auto sqrtz = sqrtNode(z);
+
+    auto powxy = powNode(x, y);
+    auto mul1 = multNodes(expx, logy);
+    auto div1 = divNodes(powxy, sqrtz);
+    auto negx = negNode(x);
+
+    auto sum1 = addNodes(sinx, cosy);
+    auto sum2 = addNodes(sum1, tanhz);
+    auto relux = reluNode(negx);
+    auto mul2 = multNodes(sum2, relux);
+    auto add3 = addNodes(mul1, mul2);
+    auto final_expr = addNodes(add3, div1);
+
+    forward(final_expr);
+
+    backpropagation(final_expr);
+
+    std::cout << "X: " << x->grad << "\n";
+    std::cout << "Y: " << y->grad << "\n";
+    std::cout << "Z: " << z->grad << "\n";
+
+    return 0;
+}
+*/
 
 int main() {
-    Node x_1 = constantNode(5.0, 1);
-    Node x_2 = constantNode(4.0, 2);
-    Node exp = powNode(x_1, x_2, 3);
+    auto a = constantNode(3.0f);
+    auto b = constantNode(-1.5f);
+    auto c = constantNode(0.0f);
+    auto d = constantNode(2.2f);
+    auto e = constantNode(4.5f);
+    auto f = constantNode(-0.7f);
+    auto g = constantNode(1.3f);
 
-    NumKin out = forward(exp);
-    printf("VALUE %f\r\n", out);
-    updateBack(exp);
-    printf("\r\n");
-    doPrintGrad(exp);
+    // Unary ops
+    auto sin_a = sinNode(a);
+    auto cos_b = cosNode(b);
+    auto tanh_c = tanhNode(c);
+    auto relu_b = reluNode(b);
+    auto neg_d = negNode(d);
+    auto exp_e = expNode(e);
+    auto log_d = logNode(d);
+    auto sqrt_g = sqrtNode(g);
+    auto neg_f = negNode(f);
+    auto relu_c = reluNode(c);
+
+    // Binary ops chaining
+    auto add1 = addNodes(sin_a, cos_b);
+    auto mul1 = multNodes(add1, tanh_c);
+    auto pow1 = powNode(mul1, constantNode(2.0f));
+    auto pow2 = powNode(a, b);
+    auto pow3 = powNode(sqrt_g, f);  // sqrt(g)^f
+
+    auto add2 = addNodes(pow1, pow2);
+    auto add3 = addNodes(add2, pow3);
+
+    // More unary inside binary
+    auto log_mul1 = logNode(mul1);   // may be invalid if mul1 <= 0
+    auto exp_neg_d = expNode(neg_d);
+    auto div2 = divNodes(log_mul1, exp_neg_d);
+
+    auto neg_pow2 = negNode(pow2);
+    auto sum_all1 = addNodes(add3, div2);
+    auto sum_all = addNodes(sum_all1, neg_pow2);
+
+    // Deep nested relus and negations
+    auto relu_sum = reluNode(sum_all);
+    auto neg_relu_sum = negNode(relu_sum);
+    auto relu_neg_relu_sum = reluNode(neg_relu_sum);
+
+    // Divide by zero cases and chaining divisions
+    auto div3 = divNodes(sum_all, relu_c);  // relu_c = 0 for c=0.0
+    auto div4 = divNodes(div3, relu_b);     // relu_b = 0 for negative b
+
+    // Final complex expression
+    auto sin_div4 = sinNode(div4);
+    auto tanh_neg_f = tanhNode(neg_f);
+    auto cos_pow3 = cosNode(pow3);
+
+    auto mul_final = multNodes(sin_div4, tanh_neg_f);
+    auto add_final1 = addNodes(div4, exp_e);
+    auto add_final2 = addNodes(add_final1, negNode(log_d));
+    auto add_final3 = addNodes(add_final2, mul_final);
+    auto final_expr = addNodes(add_final3, cos_pow3);
+
+    // Forward and backward
+    forward(final_expr);
+    backpropagation(final_expr);
+
+    // Print grads and values
+    std::cout << "a grad: " << a->grad << ", value: " << a->value << "\n";
+    std::cout << "b grad: " << b->grad << ", value: " << b->value << "\n";
+    std::cout << "c grad: " << c->grad << ", value: " << c->value << "\n";
+    std::cout << "d grad: " << d->grad << ", value: " << d->value << "\n";
+    std::cout << "e grad: " << e->grad << ", value: " << e->value << "\n";
+    std::cout << "f grad: " << f->grad << ", value: " << f->value << "\n";
+    std::cout << "g grad: " << g->grad << ", value: " << g->value << "\n";
+
+    return 0;
 }
-
-
 
