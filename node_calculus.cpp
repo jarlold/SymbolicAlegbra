@@ -42,6 +42,7 @@ NodePtr constantNode(NumKin v) {
 
 // These are operations that take two expression-node-things
 // and returns a new one, that performs the operation on them both
+// it might have been better to have opNode(NodePtr, NodePtr, Operation op); instead...
 NodePtr addNodes(NodePtr lhs, NodePtr rhs) {
     auto n = std::make_shared<Node>();
     n->lhs = lhs;

@@ -15,7 +15,7 @@ void test1() {
             B[i][j] = constantNode(std::cos(0.2f * i - 0.3f * j + 2.0f));
 
     // Matrix multiplication: (5x4) * (4x8) = (5x8)
-    auto C = matmul(A, B);
+    auto C = multMatrix(A, B);
 
     // Apply tanh to each output node and sum to create scalar loss
     NodePtr loss = tanhNode(C[0][0]);
@@ -124,9 +124,262 @@ void test2() {
     std::cout << "g grad: " << g->grad << ", value: " << g->value << "\n";
 }
 
+void test3() {
+    // Create zero node
+    NodePtr zero_node = constantNode(0.0f);
+
+    // Create Tensor3 with 1 channel, 3x3 grid, values 1..9 as constantNodes
+    int C = 1, H = 3, W = 3;
+    Tensor3 input(C, Matrix(H, Vector(W)));
+
+    int val = 1;
+    for (int c = 0; c < C; ++c) {
+        for (int h = 0; h < H; ++h) {
+            for (int w = 0; w < W; ++w) {
+                input[c][h][w] = constantNode(static_cast<NumKin>(val++));
+            }
+        }
+    }
+
+    std::cout << "Original Tensor3 values:\n";
+    for (const auto& row : input[0]) {
+        for (const auto& n : row) {
+            std::cout << n->value << " ";
+        }
+        std::cout << "\n";
+    }
+
+    // Pad tensor with 1 zero border
+    Tensor3 padded = padTensor3(input, 1, 1, zero_node);
+
+    std::cout << "\nPadded Tensor3 values:\n";
+    for (const auto& row : padded[0]) {
+        for (const auto& n : row) {
+            std::cout << n->value << " ";
+        }
+        std::cout << "\n";
+    }
+
+    // im2col with 2x2 kernel, stride 1
+    int kernel_h = 2, kernel_w = 2;
+    Matrix cols = im2col(padded, kernel_h, kernel_w);
+
+    // For each patch (column), create a sum node by adding all nodes in the patch
+    int num_patches = cols[0].size();
+    std::vector<NodePtr> patch_sums(num_patches);
+
+    for (int p = 0; p < num_patches; ++p) {
+        NodePtr sum_node = constantNode(0.0f);
+        for (int i = 0; i < (int)cols.size(); ++i) {
+            sum_node = addNodes(sum_node, cols[i][p]);
+        }
+        patch_sums[p] = sum_node;
+    }
+
+    // Forward pass: update values for all patch sums
+    for (auto& node : patch_sums) {
+        std::unordered_set<NodePtr> visited;
+        updateValue(node, visited);
+    }
+
+    std::cout << "\nPatch sums (forward pass):\n";
+    for (auto& node : patch_sums) {
+        std::cout << node->value << " ";
+    }
+    std::cout << "\n";
+
+    // Set gradient 1 for all patch sums and backpropagate
+    for (auto& node : patch_sums) {
+        node->grad = 1.0f;
+        std::unordered_set<NodePtr> visited;
+        updateBack(node, visited);
+    }
+
+    // Print gradients for original input nodes to see backprop through padding + im2col
+    std::cout << "\nGradients on original input nodes after backpropagation:\n";
+    for (const auto& row : input[0]) {
+        for (const auto& n : row) {
+            std::cout << n->grad << " ";
+        }
+        std::cout << "\n";
+    }
+}
+
+void test4() {
+    // 1 input, 1 channel, 3x3
+    Tensor4 input(1, Tensor3(1, Matrix(3, Vector(3))));
+    // 1 filter, 1 channel, 2x2
+    Tensor4 filters(1, Tensor3(1, Matrix(2, Vector(2))));
+
+    // Fill input with constant nodes (values 1 to 9)
+    int val = 1;
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            input[0][0][i][j] = constantNode(val++);
+
+    // Fill filter with constant nodes (values 1, 0, -1, 0)
+    std::vector<float> filter_vals = {1, 0, -1, 0};
+    int idx = 0;
+    for (int i = 0; i < 2; ++i)
+        for (int j = 0; j < 2; ++j)
+            filters[0][0][i][j] = constantNode(filter_vals[idx++]);
+
+    // Run conv2d (no padding, stride=1)
+    Tensor4 out = conv2d(input, filters, 1, 0);
+
+    // Take one output scalar and backprop from it
+    NodePtr output_node = out[0][0][0][0];  // First element
+    backpropagation(output_node);
+
+    // Print input gradients
+    std::cout << "Input gradients:\n";
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            std::cout << input[0][0][i][j]->grad << " ";
+        }
+        std::cout << "\n";
+    }
+
+    // Print filter gradients
+    std::cout << "\nFilter gradients:\n";
+    for (int i = 0; i < 2; ++i) {
+        for (int j = 0; j < 2; ++j) {
+            std::cout << filters[0][0][i][j]->grad << " ";
+        }
+        std::cout << "\n";
+    }
+
+}
+
+void test5() {
+    // 1 input, 1 channel, 5x5
+    Tensor4 input(1, Tensor3(1, Matrix(5, Vector(5))));
+    // 1 filter, 1 channel, 3x3
+    Tensor4 filters(1, Tensor3(1, Matrix(3, Vector(3))));
+
+    // Fill input with constant nodes (values 1 to 25)
+    int val = 1;
+    for (int i = 0; i < 5; ++i)
+        for (int j = 0; j < 5; ++j)
+            input[0][0][i][j] = constantNode(val++);
+
+    // Fill filter with constant nodes (values for Sobel-like filter)
+    std::vector<float> filter_vals = {
+        1, 0, -1,
+        1, 0, -1,
+        1, 0, -1
+    };
+    int idx = 0;
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            filters[0][0][i][j] = constantNode(filter_vals[idx++]);
+
+    // Run conv2d (no padding, stride=1)
+    Tensor4 out = conv2d(input, filters, 1, 0);
+
+    // Take one output scalar and backprop from it
+    NodePtr output_node = out[0][0][0][0];  // First element of output
+    backpropagation(output_node);
+
+    // Print input gradients
+    std::cout << "Input gradients:\n";
+    for (int i = 0; i < 5; ++i) {
+        for (int j = 0; j < 5; ++j) {
+            std::cout << input[0][0][i][j]->grad << " ";
+        }
+        std::cout << "\n";
+    }
+
+    // Print filter gradients
+    std::cout << "\nFilter gradients:\n";
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            std::cout << filters[0][0][i][j]->grad << " ";
+        }
+        std::cout << "\n";
+    }
+}
+
+
+void sgd_test1() {
+    // Generate synthetic data: y = 2.0 * x + 1.0 + noise
+    std::vector<NumKin> x_data, y_data;
+    for (int i = 0; i < 1000; ++i) {
+        //NumKin noise = ((std::rand() % 100) / 100.0f - 0.5f) * 2; // noise in [-1,1]
+        NumKin x = i / 10.0f;
+        NumKin y = 5.0f * x + 1.5f; // + noise;
+        x_data.push_back(x);
+        y_data.push_back(y);
+    }
+
+    // Intial value for weight and bias
+    NumKin w_val = 1.0;
+    NumKin b_val = 1.0;
+
+    float learning_rate = 0.02;
+
+    // Let's S this GD my dudes
+    for (int epoch = 0; epoch < 100000; ++epoch) {
+        NumKin loss_total = 0.0f;
+        NumKin w_grad = 0.0f;
+        NumKin b_grad = 0.0f;
+
+        for (size_t i = 0; i < x_data.size(); ++i) {
+            // Create constant input nodes
+            NodePtr x = constantNode(x_data[i]);
+            NodePtr y_true = constantNode(y_data[i]);
+
+            // Create variable nodes
+            NodePtr w = constantNode(w_val);
+            NodePtr b = constantNode(b_val);
+
+            // Forward: prediction = w*x + b
+            NodePtr pred = addNodes(multNodes(w, x), b);
+
+            // Loss = (pred - y_true)^2
+            NodePtr error = addNodes(pred, negNode(y_true));
+            NodePtr loss = powNode(error, constantNode(2.0f));
+
+            // Run forward and backward
+            forward(loss);
+            backpropagation(loss);
+
+            // Accumulate gradients from this sample
+            loss_total += loss->value;
+            w_grad += w->grad;
+            b_grad += b->grad;
+        }
+
+        if ( (loss_total/x_data.size()) <= 1.0f) {
+            printf("BREAK\r\n");
+            std::cout << "Epoch " << epoch
+                      << " | Loss: " << (loss_total / x_data.size())
+                      << " | w: " << w_val
+                      << " | b: " << b_val << std::endl;
+            return;
+        }
+
+        w_val -= learning_rate * (w_grad / x_data.size());
+        b_val -= learning_rate * (b_grad / x_data.size());
+
+        if (epoch % 10 == 0) {
+            std::cout << "Epoch " << epoch
+                      << " | Loss: " << (loss_total / x_data.size())
+                      << " | w: " << w_val
+                      << " | b: " << b_val << std::endl;
+        }
+    }
+}
+
 int main() {
+    /*
     test1();
     test2();
+    test3();
+    test4();
+    test5();
+    */
+    sgd_test1();
     return 0;
 }
 

@@ -17,3 +17,41 @@ d grad: -inf, value: 2.2
 e grad: 90.0171, value: 4.5
 f grad: -nan, value: -0.7
 g grad: -inf, value: 1.3
+Original Tensor3 values:
+1 2 3 
+4 5 6 
+7 8 9 
+
+Padded Tensor3 values:
+0 0 0 0 0 
+0 1 2 3 0 
+0 4 5 6 0 
+0 7 8 9 0 
+0 0 0 0 0 
+
+Patch sums (forward pass):
+1 3 5 3 5 12 16 9 11 24 28 15 7 15 17 9 
+
+Gradients on original input nodes after backpropagation:
+4 4 4 
+4 4 4 
+4 4 4 
+Input gradients:
+1 0 0 
+-1 0 0 
+0 0 0 
+
+Filter gradients:
+1 2 
+4 5 
+Input gradients:
+1 0 -1 0 0 
+1 0 -1 0 0 
+1 0 -1 0 0 
+0 0 0 0 0 
+0 0 0 0 0 
+
+Filter gradients:
+1 2 3 
+6 7 8 
+11 12 13 
