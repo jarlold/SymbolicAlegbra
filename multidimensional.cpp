@@ -1,3 +1,4 @@
+#pragma once
 #include "node_calculus.cpp"
 #include <vector>
 #include <stdio.h>
@@ -9,6 +10,14 @@ using Vector = std::vector<NodePtr>;
 using Matrix = std::vector<Vector>;
 using Tensor3 = std::vector<Matrix>;
 using Tensor4 = std::vector<Tensor3>;
+
+// Stuff I should get around to adding but I don't really
+// need right now.
+Vector addVector(Vector& v1, Vector& v2);
+Vector addVector(Vector& v1, NumKin n);
+Vector scaleVector(Vector& v1, NumKin s);
+
+// More complicated functions that serve a proper purpose
 
 Matrix addMatrix(const Matrix& A, const Matrix& B) {
     int w = A.size();
