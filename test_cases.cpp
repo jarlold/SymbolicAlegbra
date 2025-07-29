@@ -1,4 +1,5 @@
 #include "node_calculus.cpp"
+#include "common.cpp"
 #include "multidimensional.cpp"
 
 void test1() {
@@ -302,83 +303,68 @@ void test5() {
 
 
 void sgd_test1() {
-    // Generate synthetic data: y = 2.0 * x + 1.0 + noise
-    std::vector<NumKin> x_data, y_data;
-    for (int i = 0; i < 1000; ++i) {
-        //NumKin noise = ((std::rand() % 100) / 100.0f - 0.5f) * 2; // noise in [-1,1]
-        NumKin x = i / 10.0f;
-        NumKin y = 5.0f * x + 1.5f; // + noise;
-        x_data.push_back(x);
-        y_data.push_back(y);
+    // This test does gradient descent on A SINGLE VALUE
+    // at at time, using NO INPUT NORMALIZATION
+    // matching the values to pytorch really serves as 
+    // our most basic sanity check.
+
+    // Generate a bunch of data
+    std::vector<NumKin> x = range(200);
+    std::vector<NumKin> y(200);
+    for (int i=0; i<200; i++) {
+        y[i] = 5.2 * x[i] + 22.8;
     }
 
-    // Intial value for weight and bias
-    NumKin w_val = 1.0;
-    NumKin b_val = 1.0;
+    // Then we'll build our model
+    NodePtr two = constantNode(2.0);
+    NodePtr w = constantNode(1.0);
+    NodePtr b = constantNode(1.0);
+    NodePtr xi = constantNode(0.0);
+    NodePtr yi = constantNode(0.0);
+    NodePtr pred = addNodes(multNodes(xi, w), b);
+    NodePtr loss = powNode(addNodes(yi, negNode(pred)), two);
 
-    float learning_rate = 0.02;
+    // Then we'll just try following along the gradient until its better
+    for (int i = 0; i < 10; i++) {
+        float numLoss;
+        int index = i; // rand() % 200;
+        xi->value = x[index];
+        yi->value = y[index];
+        resetGraph(loss);
+        numLoss = forward(loss);
 
-    // Let's S this GD my dudes
-    for (int epoch = 0; epoch < 100000; ++epoch) {
-        NumKin loss_total = 0.0f;
-        NumKin w_grad = 0.0f;
-        NumKin b_grad = 0.0f;
+        if (numLoss <= 1.0) break;
 
-        for (size_t i = 0; i < x_data.size(); ++i) {
-            // Create constant input nodes
-            NodePtr x = constantNode(x_data[i]);
-            NodePtr y_true = constantNode(y_data[i]);
 
-            // Create variable nodes
-            NodePtr w = constantNode(w_val);
-            NodePtr b = constantNode(b_val);
+        backpropagation(loss);
 
-            // Forward: prediction = w*x + b
-            NodePtr pred = addNodes(multNodes(w, x), b);
+        printf(
+            "w Grad %f\r\n"
+            "b Grad %f\r\n"
+            "w Val  %f\r\n"
+            "b Val  %f\r\n"
+            "Loss   %f\r\n\r\n",
+            w->grad,
+            b->grad,
+            w->value,
+            b->value,
+            numLoss
+        );
 
-            // Loss = (pred - y_true)^2
-            NodePtr error = addNodes(pred, negNode(y_true));
-            NodePtr loss = powNode(error, constantNode(2.0f));
+        w->value -= w->grad  * 0.0001;
+        b->value -= b->grad * 0.0001;
 
-            // Run forward and backward
-            forward(loss);
-            backpropagation(loss);
 
-            // Accumulate gradients from this sample
-            loss_total += loss->value;
-            w_grad += w->grad;
-            b_grad += b->grad;
-        }
-
-        if ( (loss_total/x_data.size()) <= 1.0f) {
-            printf("BREAK\r\n");
-            std::cout << "Epoch " << epoch
-                      << " | Loss: " << (loss_total / x_data.size())
-                      << " | w: " << w_val
-                      << " | b: " << b_val << std::endl;
-            return;
-        }
-
-        w_val -= learning_rate * (w_grad / x_data.size());
-        b_val -= learning_rate * (b_grad / x_data.size());
-
-        if (epoch % 10 == 0) {
-            std::cout << "Epoch " << epoch
-                      << " | Loss: " << (loss_total / x_data.size())
-                      << " | w: " << w_val
-                      << " | b: " << b_val << std::endl;
-        }
     }
 }
 
+
 int main() {
-    /*
     test1();
     test2();
     test3();
     test4();
     test5();
-    */
     sgd_test1();
     return 0;
 }
