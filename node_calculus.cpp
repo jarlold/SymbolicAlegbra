@@ -252,6 +252,20 @@ void updateBack(NodePtr n, std::unordered_set<NodePtr>& visited) {
     }
 }
 
+void resetGraph(NodePtr root) {
+    // Make the graph ready to use again!
+    root->grad = 0;
+
+    // Reset all the values that aren't 'constants'
+    if (root->oper != NONE)
+        root->value = 0;
+
+    // Not just the root node, but the root women and root children
+    // too!
+    if (root->lhs) resetGraph(root->lhs);
+    if (root->rhs) resetGraph(root->rhs);
+}
+
 void backpropagation(NodePtr root) {
     root->grad = 1.0f;
     std::unordered_set<NodePtr> visited;
