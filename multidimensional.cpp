@@ -1,7 +1,8 @@
 #pragma once
-#include "node_calculus.cpp"
 #include <vector>
 #include <stdio.h>
+#include "node_calculus.cpp"
+#include "common.cpp"
 
 // Matrix is a 2D vector of NodePtrs
 // tensor3 is a bunch of matrices, and well,
@@ -12,13 +13,79 @@ using Tensor3 = std::vector<Matrix>;
 using Tensor4 = std::vector<Tensor3>;
 
 // Stuff I should get around to adding but I don't really
-// need right now.
-Vector addVector(Vector& v1, Vector& v2);
-Vector addVector(Vector& v1, NumKin n);
-Vector scaleVector(Vector& v1, NumKin s);
+// need right now. EDIT: I added them but i haven't tested shit lol
+Vector addVector(Vector& v1, Vector& v2) {
+    int len = v1.size();
+    Vector result(len);
+    for (int i = 0; i < len; ++i) {
+        result[i] = addNodes(v1[i], v2[i]);
+    }
+    return result;
+}
+
+Vector addVector(Vector& v1, NodePtr n) {
+    // Is it okay that tehse are all using the same N? Probably, maybe. Idk?
+    int len = v1.size();
+    Vector result(len);
+    for (int i = 0; i < len; ++i) {
+        result[i] = addNodes(v1[i], n);
+    }
+    return result;
+}
+
+NodePtr sumVector(Vector& v) {
+    NodePtr result;
+    for (size_t i =0; i < v.size(); i++) {
+        NodePtr a = addNodes(result, v[i]); 
+        result = a;
+    }
+    return result;
+}
+
+Vector scaleVector(Vector& v1, NodePtr s) {
+    int len = v1.size();
+    Vector result(len);
+    for (int i = 0; i < len; ++i) {
+        result[i] = multNodes(v1[i], s);
+    }
+    return result;
+}
+
+// Various constructors for the data types, random, ones, zeros, etc.
+Vector randomVector(int length) {
+    Vector v(length);
+    for (int i = 0; i < length; ++i) {
+        v[i] = constantNode(randomFloat());
+    }
+    return v;
+}
+
+Matrix randomMatrix(int length, int width) {
+    Matrix m(length);
+    for (int i = 0; i < length; ++i) {
+        m[i] = randomVector(width);
+    }
+    return m;
+}
+
+Tensor3 randomTensor3(int length, int width, int height) {
+    Tensor3 t(length);
+    for (int i = 0; i < length; ++i) {
+        t[i] = randomMatrix(width, height);
+    }
+    return t;
+}
+
+Tensor4 randomTensor4(int length, int width, int height, int depth) {
+    Tensor4 t(length);
+    for (int i = 0; i < length; ++i) {
+        t[i] = randomTensor3(width, height, depth);
+    }
+    return t;
+}
+
 
 // More complicated functions that serve a proper purpose
-
 Matrix addMatrix(const Matrix& A, const Matrix& B) {
     int w = A.size();
     int l = A[0].size();
@@ -209,6 +276,8 @@ Tensor4 conv2d(const Tensor4& input, const Tensor4& filters, int stride = 1, int
 
     return output;
 }
+
+
 
 // Printouts
 // TODO: Rework these so they aren't doodoo
