@@ -1,5 +1,12 @@
+/* Random tests I've been using while I work on this
+   project.
+*/
+
 #include "node_calculus.cpp"
+#include "neural.cpp"
+#include "mnist.cpp"
 #include "common.cpp"
+#include "losses.cpp"
 #include "multidimensional.cpp"
 
 void test1() {
@@ -301,8 +308,7 @@ void test5() {
     }
 }
 
-
-void sgd_test1() {
+void sgdTest1() {
     // This test does gradient descent on A SINGLE VALUE
     // at at time, using NO INPUT NORMALIZATION
     // matching the values to pytorch really serves as 
@@ -325,7 +331,7 @@ void sgd_test1() {
     NodePtr loss = powNode(addNodes(yi, negNode(pred)), two);
 
     // Then we'll just try following along the gradient until its better
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 2; i++) {
         float numLoss;
         int index = i; // rand() % 200;
         xi->value = x[index];
@@ -334,8 +340,6 @@ void sgd_test1() {
         numLoss = forward(loss);
 
         if (numLoss <= 1.0) break;
-
-
         backpropagation(loss);
 
         printf(
@@ -353,19 +357,226 @@ void sgd_test1() {
 
         w->value -= w->grad  * 0.0001;
         b->value -= b->grad * 0.0001;
-
-
     }
 }
 
+void sgdTest2() {
+    // This time we'll normalize it I guess
+    // In hindsight trying to fit a normalized linear
+    // function isn't very clever because y=x lmao
+    std::vector<NumKin> raw_x = range(200);
+    std::vector<NumKin> raw_y(200);
+    for (int i = 0; i < 200; i++) {
+        raw_y[i] = 5.2f * raw_x[i] + 200.8f;
+    }
+
+    // Normalize x and y
+    NumKin x_mean = mean(raw_x);
+    NumKin x_std = stddev(raw_x, x_mean);
+    NumKin y_mean = mean(raw_y);
+    NumKin y_std = stddev(raw_y, y_mean);
+
+    std::vector<NumKin> x(200), y(200);
+    for (int i = 0; i < 200; i++) {
+        x[i] = (raw_x[i] - x_mean) / x_std;
+        y[i] = (raw_y[i] - y_mean) / y_std;
+    }
+
+    // Then we'll build our model
+    NodePtr two = constantNode(2.0);
+    NodePtr w = constantNode(1.0);
+    NodePtr b = constantNode(1.0);
+    NodePtr xi = constantNode(0.0);
+    NodePtr yi = constantNode(0.0);
+    NodePtr pred = addNodes(multNodes(xi, w), b);
+    NodePtr loss = powNode(addNodes(yi, negNode(pred)), two);
+
+    // Then we'll just try following along the gradient until its better
+    for (int i = 0; i < 200; i++) {
+        float numLoss;
+        int index = i ; //5 + (rand() % 199);
+        xi->value = x[index];
+        yi->value = y[index];
+        resetGraph(loss);
+        numLoss = forward(loss);
+
+        //if (numLoss <= 1.0) break;
+
+
+        backpropagation(loss);
+
+        printf("Values: %f %f\r\n", xi->value, yi->value);
+        printf(
+            "w Grad %f\r\n"
+            "b Grad %f\r\n"
+            "w Val  %f\r\n"
+            "b Val  %f\r\n"
+            "Loss   %f\r\n\r\n",
+            w->grad,
+            b->grad,
+            w->value,
+            b->value,
+            numLoss
+        );
+
+
+        w->value -= w->grad  * 0.0001;
+        b->value -= b->grad * 0.0001;
+    }
+}
+
+void lossTest1() {
+    int testSize = 10;
+    Vector v1(testSize);
+    for (int i=0; i < testSize; i++) {
+        v1[i] = constantNode(i);
+    }
+
+    // Behold! my very smart and unique clever
+    // test vetor!
+    Vector v2(testSize);
+    for (int i=0; i < testSize; i++) {
+        v2[i] = constantNode( testSize+ i);
+    }
+
+    NodePtr mse = meanSquaredError(v1, v2);
+
+    NumKin v = forward(mse);
+    printf("Loss is %f \r\n", v);
+
+    backpropagation(mse);
+    printf("%f\r\n", mse->rhs->grad);
+    for (int i=0; i < testSize; i++) {
+        printf("V1_%d grad: %f ", i, v1[i]->grad);
+        printf("V2_%d grad: %f", i, v2[i]->grad);
+        printf("\r\n");
+    }
+
+}
+
+void lossTest2() {
+    // TODO: This test fails fix it later
+    Vector results(5);
+    for (int i =0; i < 5; i++) {
+        results[i] = constantNode(sin(i/20.0));
+    }
+
+    size_t realAnswer = 2;
+    NodePtr closs = crossEntropyLogits(results, realAnswer);
+
+    NumKin out = forward(closs);
+    printf("Cross entropy is %f\r\n", out);
+
+    backpropagation(closs);
+    printf("Cross entropy grads are:\r\n");
+    for (int i = 0; i < 5; i++) {
+        printf("%d's grad is %f\r\n", i, results[i]->grad);
+    }
+
+
+
+
+}
+
+void matmulTest1() {
+    Vector inputs = randomVector(3);
+    Matrix weights = randomMatrix(4, 3);
+
+    // Make matrices like 1, 2, 3, 4.. blah
+    for (int i =0; i < 3; i++) inputs[i] = constantNode(i+1);
+
+    for (size_t i =0; i < weights.size(); i++) {
+        for (size_t  j =0; j<weights[0].size(); j++) {
+            weights[i][j] = constantNode(j*weights[0].size() + i);
+        }
+    }
+
+    // Then we can test our vector matrix multiplication
+    Vector o = multMatrixVector(weights, inputs);
+
+    printVector(inputs);
+    printMatrix(weights);
+
+    // Then let's print out the results
+    for (int i =0; i < 4; i++) {
+        printf("%f\r\n", forward(o[i]));
+    }
+
+
+}
+
+void matmulTest2() {
+    Vector inputs = randomVector(15);
+
+    // Then we'll do some randomly initialized
+    // weights, it would make more sense to
+    // use xavier initialization.
+    Matrix w1 = randomMatrix(20, 15);
+    Matrix w2 = randomMatrix(10, 20);
+    Matrix w3 = randomMatrix(1,  10);
+
+    // Do the forwards pass
+    // TODO: Pick an activation function and add it in
+    Vector outputs;
+    outputs = multMatrixVector(w1, inputs);
+    outputs = multMatrixVector(w2, outputs);
+    outputs = multMatrixVector(w3, outputs);
+}
+
+void fullyConnectedTest1() {
+    MNISTData mnistd = loadMNIST(
+        "MNIST/train-images.idx3-ubyte",
+        "MNIST/train-labels.idx1-ubyte"
+    );
+
+    // Create the input vector, it can be
+    // random, since we're going to load in the
+    // values from the images into it anyway.
+    Vector inputs = randomVector(15);
+
+    // Then we'll do some randomly initialized
+    // weights, it would make more sense to
+    // use xavier initialization.
+    Matrix w1 = randomMatrix(20, 15);
+    Matrix w2 = randomMatrix(20, 20);
+    Matrix w3 = randomMatrix(10, 20);
+
+    // Do the forwards pass
+    // TODO: Pick an activation function and add it in
+    Vector outputs;
+    outputs = multMatrixVector(w1, inputs);
+    outputs = multMatrixVector(w2, outputs);
+    outputs = multMatrixVector(w3, outputs);
+
+    NodePtr output = outputs[ mnistd.labels[4]];
+
+    forward(output);
+    printf("Predicted Value: %f\r\n", output->value);
+    backpropagation(output);
+
+    // Now let's see how wrong it was, just on this one example
+    updateWeightsMatrix(w1, 0.001);
+    updateWeightsMatrix(w2, 0.001);
+    updateWeightsMatrix(w3, 0.001);
+
+}
 
 int main() {
+    /*
     test1();
     test2();
     test3();
     test4();
     test5();
-    sgd_test1();
+    sgdTest1();
+    sgdTest2();
+    lossTest1();
+    lossTest2();
+    matmulTest2();
+    */
+
+    fullyConnectedTest1();
+
     return 0;
 }
 

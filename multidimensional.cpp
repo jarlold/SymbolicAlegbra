@@ -1,3 +1,8 @@
+/* This file is for extending the basic operations in
+    node_calculus.cpp to support multidimensional linear
+    algebra type stuff.
+*/
+
 #pragma once
 #include <vector>
 #include <stdio.h>
@@ -86,6 +91,31 @@ Tensor4 randomTensor4(int length, int width, int height, int depth) {
 
 
 // More complicated functions that serve a proper purpose
+
+Vector multMatrixVector(const Matrix& matrix, const Vector& vector) {
+    int numRows = matrix.size();
+    int numCols = matrix[0].size();
+    int vectorLength = vector.size();
+
+    if (numCols != vectorLength) {
+        throw std::invalid_argument("Bad shapes for vector matrix multiplication.");
+    }
+
+    Vector result(numRows);
+    for (int i=0; i < numRows; i++) {
+        // Initialize it as all zeros
+        result[i] = constantNode(0);
+
+        // Tally up the row-col multiplication
+        for (int j=0; j< numCols; j++) {
+            NodePtr s = multNodes(matrix[i][j], vector[j]);
+            result[i] = addNodes(result[i], s);
+        }
+    }
+
+    return result;
+}
+
 Matrix addMatrix(const Matrix& A, const Matrix& B) {
     int w = A.size();
     int l = A[0].size();
@@ -249,7 +279,8 @@ Tensor4 conv2d(const Tensor4& input, const Tensor4& filters, int stride = 1, int
 
     for (int b = 0; b < batch_size; ++b) {
         // im2col for the current input
-        Matrix cols = im2col(padded_input[b], kernel_h, kernel_w, stride);  // shape: (out_h * out_w, in_channels * kernel_h * kernel_w)
+        // shape: (out_h * out_w, in_channels * kernel_h * kernel_w)
+        Matrix cols = im2col(padded_input[b], kernel_h, kernel_w, stride);  
 
         for (int oc = 0; oc < out_channels; ++oc) {
             // Flatten filter to a row vector
@@ -295,13 +326,28 @@ void printTensor3(const Tensor3& tensor) {
     }
 }
 
-void printMatrix(const Matrix& mat) {
-    for (const auto& row : mat) {
-        for (const auto& val : row) {
-            std::cout << val->value << " ";
-        }
-        std::cout << "\n";
+void printVector(const Vector& v) {
+    printf("[ ");
+    for (size_t i =0; i < v.size(); i++) {
+        printf("%f", v[i]->value);
+        if (i==v.size()-1)
+            printf(" ");
+        else
+            printf(", ");
+
     }
+    printf(" ]\r\n");
+}
+
+void printMatrix(const Matrix& mat) {
+    printf("[\r\n");
+
+    for (size_t i=0; i < mat.size(); i++) {
+        printf("    ");
+        printVector(mat[i]);
+    }
+    
+    printf("]\r\n");
 }
 
 void printTensor4Values(const Tensor4& tensor) {

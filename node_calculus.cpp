@@ -1,3 +1,11 @@
+/*  Create a compute graph of basic operations that
+    we can support the backwards propogation of. So essentially
+    you can differentiate and optimize any function that you can
+    describe using the operations listed in 
+    the Operation enum.
+*/
+
+
 #pragma once
 #include <iostream>
 #include <cmath>
@@ -178,6 +186,9 @@ void updateValue(NodePtr n, std::unordered_set<NodePtr>& visited) {
 }
 
 NumKin forward(NodePtr root) {
+    //TODO: Instead of donig this recurisvely iterate without
+    // revisiting. I forget the name of what its called when you
+    // do that.
     std::unordered_set<NodePtr> visited;
     updateValue(root, visited);
     return root->value;
